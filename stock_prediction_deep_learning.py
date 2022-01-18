@@ -76,7 +76,7 @@ if __name__ == '__main__':
     STOCK_VALIDATION_DATE = pd.to_datetime('2021-12-17')
     EPOCHS = 100
     BATCH_SIZE = 32
-    TIME_STEPS = 3
+    TIME_STEPS = 10
     TODAY_RUN = datetime.today().strftime("%Y%m%d")
     TOKEN = STOCK_TICKER + '_' + TODAY_RUN + '_' + secrets.token_hex(16)
     print('Ticker: ' + STOCK_TICKER)

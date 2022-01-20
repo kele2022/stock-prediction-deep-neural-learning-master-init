@@ -15,14 +15,18 @@
 
 
 class StockPrediction:
-    def __init__(self, ticker, start_date, validation_date, project_folder):
+    def __init__(self, ticker, candle, start_date, validation_date, project_folder):
         self._ticker = ticker
+        self.candle = candle
         self._start_date = start_date
         self._validation_date = validation_date
         self._project_folder = project_folder
 
     def get_ticker(self):
         return self._ticker
+
+    def get_candle(self):
+        return self.candle
 
     def set_ticker(self, value):
         self._ticker = value

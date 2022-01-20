@@ -22,11 +22,13 @@ from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 import yfinance as yf
 
+from Function import *
+
 
 class StockData:
     def __init__(self, stock):
         self._stock = stock
-        self._sec = yf.Ticker(self._stock.get_ticker())
+        # self._sec = yf.Ticker(self._stock.get_ticker())
         self._min_max = MinMaxScaler(feature_range=(0, 1))
 
     def __data_verification(self, train):
@@ -36,33 +38,46 @@ class StockData:
         print('Std dev:', train.std(axis=0))
 
     def get_stock_short_name(self):
-        return self._sec.info['shortName']
+        return self._stock.get_ticker()
 
     def get_min_max(self):
         return self._min_max
 
     def get_stock_currency(self):
-        return self._sec.info['currency']
+        return self._stock.get_ticker()
 
-    def download_transform_to_numpy(self, time_steps, project_folder):
-        end_date = datetime.today()
-        print('End Date: ' + end_date.strftime("%Y-%m-%d"))
-        interval ="60m"
-        data = yf.download([self._stock.get_ticker()], start=self._stock.get_start_date(), end=end_date, interval=interval)[['Close']]
-        data = data.reset_index()
-        data.to_csv(os.path.join(project_folder, 'downloaded_data_'+self._stock.get_ticker()+'.csv'))
-        #print(data)
-        if interval == "60m":
-            # 删除时区  小时数据
-            data['Datetime'] = pd.to_datetime(data.Datetime).dt.tz_localize(None)
-            data.rename(columns={'Datetime': 'Date'}, inplace=True)
+    def load_transform_to_numpy(self, time_steps, project_folder):
+        #  原始数据数据的路径
+        data_path = 'D:\\binance\\spot_1m\\'
+        # 生成 分钟数据k 线
+        start_time = self._stock.get_start_date().strftime("%Y-%m-%d")
+        end_date = "2021-07-02"
 
+        # data = yf.download(["ETH-USD"], start=self._stock.get_start_date(), end=end_date)[['Close']]
+
+        data = get_data_frame(data_path, self._stock.get_ticker(), start_time, end_date, self._stock.get_candle())
+        # data = data[['volume', 'close']]
+
+        data = data[["candle_begin_time", 'close']]
+        data.rename(columns={'candle_begin_time': 'Date', 'close': 'Close'}, inplace=True)
+        # data.set_index(["candle_begin_time"], inplace=True)
+        # data = data.reset_index()
+        data.to_csv(os.path.join(project_folder, 'downloaded_data_' + self._stock.get_ticker() + '.csv'))
+        # print(data)
         training_data = data[data['Date'] < self._stock.get_validation_date()].copy()
         test_data = data[data['Date'] >= self._stock.get_validation_date()].copy()
         training_data = training_data.set_index('Date')
         # Set the data frame index using column Date
         test_data = test_data.set_index('Date')
-        #print(test_data)
+
+        print("==================training_data=============")
+        print(training_data.head(2))
+        print(training_data.tail(2))
+        print("==================training_data=============")
+        print("==================test_data=================")
+        print(test_data.head(2))
+        print(test_data.tail(2))
+        print("==================test_data=================")
 
         train_scaled = self._min_max.fit_transform(training_data)
         self.__data_verification(train_scaled)
@@ -79,7 +94,66 @@ class StockData:
 
         total_data = pd.concat((training_data, test_data), axis=0)
         inputs = total_data[len(total_data) - len(test_data) - time_steps:]
-        test_scaled = self._min_max.fit_transform(inputs)
+
+        test_scaled = self._min_max.transform(inputs)
+
+        # Testing Data Transformation
+        x_test = []
+        y_test = []
+        for i in range(time_steps, test_scaled.shape[0]):
+            x_test.append(test_scaled[i - time_steps:i])
+            y_test.append(test_scaled[i, 0])
+
+        x_test, y_test = np.array(x_test), np.array(y_test)
+        x_test = np.reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+        return (x_train, y_train), (x_test, y_test), (training_data, test_data)
+
+
+    def download_transform_to_numpy(self, time_steps, project_folder):
+        end_date = datetime.today()
+        print('End Date: ' + end_date.strftime("%Y-%m-%d"))
+        interval ="60m"
+        data = yf.download([self._stock.get_ticker()], start=self._stock.get_start_date(), end=end_date, interval=interval)[['Close']]
+        data = data.reset_index()
+        data.to_csv(os.path.join(project_folder, 'downloaded_data_'+self._stock.get_ticker()+'.csv'))
+
+        if interval == "60m":
+            # 删除时区  小时数据
+            data['Datetime'] = pd.to_datetime(data.Datetime).dt.tz_localize(None)
+            data.rename(columns={'Datetime': 'Date'}, inplace=True)
+
+        training_data = data[data['Date'] < self._stock.get_validation_date()].copy()
+        test_data = data[data['Date'] >= self._stock.get_validation_date()].copy()
+        training_data = training_data.set_index('Date')
+        # Set the data frame index using column Date
+        test_data = test_data.set_index('Date')
+
+        print("==================training_data=============")
+        training_data.head(2)
+        training_data.tail(2)
+        print("==================training_data=============")
+        print("==================test_data=================")
+        test_data.head(2)
+        test_data.tail(2)
+        print("==================test_data=================")
+
+        train_scaled = self._min_max.fit_transform(training_data)
+        self.__data_verification(train_scaled)
+
+        # Training Data Transformation
+        x_train = []
+        y_train = []
+        for i in range(time_steps, train_scaled.shape[0]):
+            x_train.append(train_scaled[i - time_steps:i])
+            y_train.append(train_scaled[i, 0])
+
+        x_train, y_train = np.array(x_train), np.array(y_train)
+        x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
+
+        total_data = pd.concat((training_data, test_data), axis=0)
+        inputs = total_data[len(total_data) - len(test_data) - time_steps:]
+
+        test_scaled = self._min_max.transform(inputs)
 
         # Testing Data Transformation
         x_test = []

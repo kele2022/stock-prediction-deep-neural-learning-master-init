@@ -19,8 +19,9 @@ from tensorflow.python.keras.layers import Dropout, Dense, LSTM
 
 
 class LongShortTermMemory:
-    def __init__(self, project_folder):
+    def __init__(self, project_folder, time_steps):
         self.project_folder = project_folder
+        self.time_steps = time_steps
 
     def get_defined_metrics(self):
         defined_metrics = [
@@ -29,8 +30,28 @@ class LongShortTermMemory:
         return defined_metrics
 
     def get_callback(self):
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min', verbose=1)
-        return callback
+        # # 设置自动停止
+        # 设置模型保存回调函数
+        checkpoint_save_path = self.project_folder + "\\{}_".format(self.time_steps) + "_cp-{epoch:04d}.ckpt"
+
+        callback_list = [
+                            # tf.keras.callbacks.EarlyStopping(
+                            #     monitor='val_loss',
+                            #     patience=3,
+                            #     mode='min',
+                            #     verbose=1),
+                            tf.keras.callbacks.ModelCheckpoint(
+                                filepath=checkpoint_save_path,
+                                save_weights_only=True,  # 只保存 权重
+                                # save_best_only=False,  # 保存最佳模型
+                                # monitor='val_loss',  # 配合save_best_only=True使用  的判断指标
+                                period=2)                # 每2epochs 保存
+
+        # 设置自适应 学习速率
+        # lr_reduce = tf.keras.callbacks.ReduceLROnPlateau('val_loss', patience=3, factor=0.5, min_lr=0.00001)
+        ]
+
+        return callback_list
 
     def create_model(self, x_train):
         model = Sequential()
@@ -52,12 +73,12 @@ class LongShortTermMemory:
         # * return_sequences = True to stack LSTM layers so the next LSTM layer has a three-dimensional sequence input
         model.add(LSTM(units=50, return_sequences=True))
         # 50% of the layers will be dropped
-        model.add(Dropout(0.5))
+        model.add(Dropout(0.2))
         # 4th LSTM layer
         # * units = add 50 neurons is the dimensionality of the output space
         model.add(LSTM(units=50))
         # 50% of the layers will be dropped
-        model.add(Dropout(0.5))
+        model.add(Dropout(0.2))
         # Dense layer that specifies an output of one unit
         model.add(Dense(units=1))
         model.summary()
